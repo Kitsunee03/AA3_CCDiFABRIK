@@ -3,62 +3,76 @@ using UnityEngine;
 
 public class CCD : MonoBehaviour
 {
-    [Header("Joints (EndEffector es el último)")]
+    [Header("Joints")]
     [SerializeField] private List<Transform> joints = new();
 
     [Header("Target")]
-    [SerializeField] private Transform target;
+    private MyVector2 targetPosition;
+    private bool hasTarget = false;
 
     [Header("Algorithm Settings")]
     [SerializeField] private float tolerance = 0.1f;
     [SerializeField] private int maxIterationsPerFrame = 10;
 
-    private List<Vector3> jointPositions;
+    [Header("Collision Settings")]
+    [SerializeField] private LayerMask collisionLayer;
+    [SerializeField] private float jointRadius = 0.1f;
+
+    private List<MyVector2> jointPositions;
     private List<float> boneLengths;
+    private IKCollisionHandler collisionHandler;
 
-    // +1 porque incluimos la base (this.transform)
-    private int TotalCount => joints.Count + 1;
+    private int TotalCount => joints.Count + 1; // includes base
+
     private int LastIndex => TotalCount - 1;
-    private Transform EndEffector => joints[joints.Count - 1];
-    private Vector3 BasePosition => transform.position;
+    private MyVector2 BasePosition => new(transform.position.x, transform.position.y);
 
-    private void Awake() { InitializeBoneLengths(); }
+    private void Awake()
+    {
+        collisionHandler = new(collisionLayer, jointRadius);
+        InitializeBoneLengths();
+    }
 
     private void LateUpdate()
     {
-        if (joints.Count < 1 || target == null) { return; }
+        if (joints.Count < 1 || !hasTarget) { return; }
 
         UpdateJointPositionsFromBase();
 
-        float distanceToTarget = Vector3.Distance(EndEffector.position, target.position);
+        float distanceToTarget = MyVector2.Distance(jointPositions[LastIndex], targetPosition);
 
         if (distanceToTarget > tolerance)
         {
             for (int i = 0; i < maxIterationsPerFrame; i++)
             {
                 PerformCCDIteration();
-
-                // check for convergence
-                if (Vector3.Distance(EndEffector.position, target.position) <= tolerance) { break; }
+                if (MyVector2.Distance(jointPositions[LastIndex], targetPosition) <= tolerance) { break; }
             }
         }
     }
 
+    public void SetTarget(MyVector2 p_position)
+    {
+        targetPosition = p_position;
+        hasTarget = true;
+    }
+
     private void InitializeBoneLengths()
     {
-        boneLengths = new List<float>();
+        boneLengths = new();
 
-        // Primer hueso: de la base al primer joint
         if (joints.Count > 0)
         {
-            boneLengths.Add(Vector3.Distance(transform.position, joints[0].position));
+            MyVector2 basePos = new(transform.position.x, transform.position.y);
+            MyVector2 firstJoint = new(joints[0].position.x, joints[0].position.y);
+            boneLengths.Add(MyVector2.Distance(basePos, firstJoint));
         }
 
-        // Resto de huesos entre joints
         for (int i = 0; i < joints.Count - 1; i++)
         {
-            float length = Vector3.Distance(joints[i].position, joints[i + 1].position);
-            boneLengths.Add(length);
+            MyVector2 joint1 = new(joints[i].position.x, joints[i].position.y);
+            MyVector2 joint2 = new(joints[i + 1].position.x, joints[i + 1].position.y);
+            boneLengths.Add(MyVector2.Distance(joint1, joint2));
         }
     }
 
@@ -66,20 +80,16 @@ public class CCD : MonoBehaviour
     {
         jointPositions = new() { BasePosition };
 
-        // Recalcular posiciones manteniendo longitudes de huesos
         for (int i = 0; i < joints.Count; i++)
         {
-            Vector3 prevPos = jointPositions[i];
-            Vector3 currentPos = joints[i].position;
-            Vector3 direction = (currentPos - prevPos).normalized;
+            MyVector2 prevPos = jointPositions[i];
+            MyVector2 currentPos = new(joints[i].position.x, joints[i].position.y);
+            MyVector2 direction = (currentPos - prevPos).normalized;
 
-            // Si la dirección es cero, mantener dirección anterior
-            if (direction.sqrMagnitude < 0.0001f)
-            {
-                direction = Vector3.up;
-            }
+            if (direction.sqrMagnitude < 0.0001f) { direction = MyVector2.up; }
 
-            jointPositions.Add(prevPos + direction * boneLengths[i]);
+            MyVector2 targetPos = prevPos + direction * boneLengths[i];
+            jointPositions.Add(collisionHandler.GetValidPosition(prevPos, targetPos));
         }
 
         SyncTransforms();
@@ -87,43 +97,46 @@ public class CCD : MonoBehaviour
 
     private void PerformCCDIteration()
     {
-        // Iterar desde el penúltimo hasta la base (incluida, para rotar desde ella)
         for (int i = LastIndex - 1; i >= 0; i--)
         {
-            Vector3 currentJoint = jointPositions[i];
+            MyVector2 currentJoint = jointPositions[i];
+            MyVector2 toEnd = (jointPositions[LastIndex] - currentJoint).normalized;
+            MyVector2 toTarget = (targetPosition - currentJoint).normalized;
+            float angle = MyVector2.SignedAngle(toEnd, toTarget);
 
-            // Calcular direcciones
-            Vector3 toEnd = (jointPositions[LastIndex] - currentJoint).normalized;
-            Vector3 toTarget = (target.position - currentJoint).normalized;
-
-            // Calcular rotación
-            float dot = Mathf.Clamp(Vector3.Dot(toEnd, toTarget), -1f, 1f);
-            float angle = Mathf.Acos(dot);
-            Vector3 axis = Vector3.Cross(toEnd, toTarget);
-
-            if (axis.sqrMagnitude > 0.0001f)
+            if (Mathf.Abs(angle) > 0.001f)
             {
-                axis.Normalize();
-                Quaternion rotation = Quaternion.AngleAxis(angle * Mathf.Rad2Deg, axis);
+                List<MyVector2> previousPositions = new(jointPositions);
 
-                // Rotar todos los joints posteriores (no la base en sí)
                 for (int j = i + 1; j < TotalCount; j++)
                 {
-                    Vector3 offset = jointPositions[j] - jointPositions[i];
-                    jointPositions[j] = jointPositions[i] + rotation * offset;
+                    MyVector2 offset = jointPositions[j] - jointPositions[i];
+                    jointPositions[j] = currentJoint + offset.Rotate(angle);
                 }
+
+                if (HasCollision(i)) { jointPositions = previousPositions; } // revert on collision
             }
         }
 
         SyncTransforms();
     }
 
+    private bool HasCollision(int p_startJointIndex)
+    {
+        for (int i = p_startJointIndex; i < TotalCount - 1; i++)
+        {
+            if (collisionHandler.HasCollision(jointPositions[i], jointPositions[i + 1])) { return true; }
+        }
+
+        return false;
+    }
+
     private void SyncTransforms()
     {
-        // Sincronizar solo los joints (no la base)
         for (int i = 0; i < joints.Count; i++)
         {
-            joints[i].position = jointPositions[i + 1];
+            MyVector2 pos = jointPositions[i + 1];
+            joints[i].position = new(pos.x, pos.y, joints[i].position.z);
         }
     }
 }

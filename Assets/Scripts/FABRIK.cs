@@ -3,34 +3,43 @@ using UnityEngine;
 
 public class FABRIK : MonoBehaviour
 {
-    [Header("Joints (EndEffector es el último)")]
+    [Header("Joints")]
     [SerializeField] private List<Transform> joints = new();
 
     [Header("Target")]
-    [SerializeField] private Transform target;
+    private MyVector2 targetPosition;
+    private bool hasTarget = false;
 
     [Header("Algorithm Settings")]
     [SerializeField] private float tolerance = 0.1f;
     [SerializeField] private int maxIterationsPerFrame = 10;
 
+    [Header("Collision Settings")]
+    [SerializeField] private LayerMask collisionLayer;
+    [SerializeField] private float jointRadius = 0.1f;
+
     private List<MyVector2> jointPositions;
     private List<float> boneLengths;
+    private IKCollisionHandler collisionHandler;
 
-    // +1 because we include the base (this.transform)
-    private int TotalCount => joints.Count + 1;
+    private int TotalCount => joints.Count + 1; // includes base
+
     private int LastIndex => TotalCount - 1;
     private MyVector2 BasePosition => new(transform.position.x, transform.position.y);
 
-    private void Awake() { InitializeBoneLengths(); }
+    private void Awake()
+    {
+        collisionHandler = new(collisionLayer, jointRadius);
+        InitializeBoneLengths();
+    }
 
     private void LateUpdate()
     {
-        if (joints.Count < 1 || target == null) { return; }
+        if (joints.Count < 1 || !hasTarget) { return; }
 
         UpdateJointPositionsFromBase();
 
-        MyVector2 targetPos = new(target.position.x, target.position.y);
-        float distanceToTarget = MyVector2.Distance(jointPositions[LastIndex], targetPos);
+        float distanceToTarget = MyVector2.Distance(jointPositions[LastIndex], targetPosition);
 
         if (distanceToTarget > tolerance)
         {
@@ -38,21 +47,23 @@ public class FABRIK : MonoBehaviour
             {
                 Forward();
                 Backward();
-
-                // Check for convergence
-                targetPos = new(target.position.x, target.position.y);
-                if (MyVector2.Distance(jointPositions[LastIndex], targetPos) <= tolerance) { break; }
+                if (MyVector2.Distance(jointPositions[LastIndex], targetPosition) <= tolerance) { break; }
             }
 
             SyncTransforms();
         }
     }
 
+    public void SetTarget(MyVector2 p_position)
+    {
+        targetPosition = p_position;
+        hasTarget = true;
+    }
+
     private void InitializeBoneLengths()
     {
         boneLengths = new();
 
-        // first bone: from base to first joint
         if (joints.Count > 0)
         {
             MyVector2 basePos = new(transform.position.x, transform.position.y);
@@ -60,13 +71,11 @@ public class FABRIK : MonoBehaviour
             boneLengths.Add(MyVector2.Distance(basePos, firstJoint));
         }
 
-        // bone lengths between joints
         for (int i = 0; i < joints.Count - 1; i++)
         {
             MyVector2 joint1 = new(joints[i].position.x, joints[i].position.y);
             MyVector2 joint2 = new(joints[i + 1].position.x, joints[i + 1].position.y);
-            float length = MyVector2.Distance(joint1, joint2);
-            boneLengths.Add(length);
+            boneLengths.Add(MyVector2.Distance(joint1, joint2));
         }
     }
 
@@ -74,46 +83,52 @@ public class FABRIK : MonoBehaviour
     {
         jointPositions = new() { BasePosition };
 
-        // Add current positions of the joints
         for (int i = 0; i < joints.Count; i++)
         {
-            jointPositions.Add(new(joints[i].position.x, joints[i].position.y));
+            MyVector2 prevPos = jointPositions[i];
+            MyVector2 currentPos = new(joints[i].position.x, joints[i].position.y);
+            MyVector2 direction = (currentPos - prevPos).normalized;
+
+            if (direction.sqrMagnitude < 0.0001f) { direction = MyVector2.up; }
+
+            MyVector2 targetPos = prevPos + direction * boneLengths[i];
+            jointPositions.Add(collisionHandler.GetValidPosition(prevPos, targetPos));
         }
     }
 
     private void Forward()
     {
-        // move the EndEffector to the target
-        jointPositions[LastIndex] = new(target.position.x, target.position.y);
+        if (collisionHandler.IsInsideCollider(targetPosition))
+        {
+            jointPositions[LastIndex] = collisionHandler.FindNearestValidPosition(jointPositions[LastIndex], targetPosition);
+        }
+        else { jointPositions[LastIndex] = targetPosition; }
 
-        // iterate backward (from the penultimate to the base, without moving it)
         for (int i = LastIndex - 1; i >= 0; i--)
         {
             float boneLength = boneLengths[i];
             MyVector2 direction = (jointPositions[i] - jointPositions[i + 1]).normalized;
 
-            // if the direction is zero, keep a default direction
             if (direction.sqrMagnitude < 0.0001f) { direction = MyVector2.up; }
 
-            jointPositions[i] = jointPositions[i + 1] + direction * boneLength;
+            MyVector2 newPos = jointPositions[i + 1] + direction * boneLength;
+            jointPositions[i] = collisionHandler.GetValidPosition(jointPositions[i + 1], newPos);
         }
     }
 
     private void Backward()
     {
-        // fix the base position
         jointPositions[0] = BasePosition;
 
-        // iterate forward from the base to the end effector
         for (int i = 1; i < TotalCount; i++)
         {
             float boneLength = boneLengths[i - 1];
             MyVector2 direction = (jointPositions[i] - jointPositions[i - 1]).normalized;
 
-            // if the direction is zero, keep a default direction
             if (direction.sqrMagnitude < 0.0001f) { direction = MyVector2.up; }
 
-            jointPositions[i] = jointPositions[i - 1] + direction * boneLength;
+            MyVector2 newPos = jointPositions[i - 1] + direction * boneLength;
+            jointPositions[i] = collisionHandler.GetValidPosition(jointPositions[i - 1], newPos);
         }
     }
 
@@ -122,7 +137,7 @@ public class FABRIK : MonoBehaviour
         for (int i = 0; i < joints.Count; i++)
         {
             MyVector2 pos = jointPositions[i + 1];
-            joints[i].position = new Vector3(pos.x, pos.y, joints[i].position.z);
+            joints[i].position = new(pos.x, pos.y, joints[i].position.z);
         }
     }
 }
