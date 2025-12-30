@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class DronController : MonoBehaviour
@@ -21,6 +22,10 @@ public class DronController : MonoBehaviour
     [SerializeField] private float movementSpeed = 5f;
     private Keyboard kb;
     private MyVector2 inputDirection = MyVector2.zero;
+
+    [Header("Collectibles")]
+    [SerializeField] public UnityEvent<int> onDiskCountChanged;
+    public int CollectedDisks { get; private set; }
 
     private void Awake()
     {
@@ -108,5 +113,11 @@ public class DronController : MonoBehaviour
         {
             if (arm2 != null) { arm2.gameObject.SetActive(!arm2.gameObject.activeSelf); }
         }
+    }
+
+    public void AddDisk()
+    {
+        CollectedDisks++;
+        onDiskCountChanged?.Invoke(CollectedDisks);
     }
 }
