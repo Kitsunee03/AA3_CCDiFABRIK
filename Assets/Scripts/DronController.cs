@@ -20,7 +20,7 @@ public class DronController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float movementSpeed = 5f;
     private Keyboard kb;
-    private MyVector2 inputDirection;
+    private MyVector2 inputDirection = MyVector2.zero;
 
     private void Awake()
     {
