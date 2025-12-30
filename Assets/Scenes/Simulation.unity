@@ -490,14 +490,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 4875973798680127000, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
-      propertyPath: arm1
-      value: 
-      objectReference: {fileID: 2115169352}
-    - target: {fileID: 4875973798680127000, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
-      propertyPath: arm2
-      value: 
-      objectReference: {fileID: 1869240687}
     - target: {fileID: 5400232378134418634, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
       propertyPath: m_Name
       value: Dron
@@ -512,17 +504,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 688018657516364823, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
   m_PrefabInstance: {fileID: 1715553232}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1869240687 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5661312403757668382, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
-  m_PrefabInstance: {fileID: 1715553232}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 61ade4e3f18746344855314b5d883d82, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &2038819160
 GameObject:
   m_ObjectHideFlags: 0
@@ -557,17 +538,6 @@ Transform:
   - {fileID: 1632272194}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2115169352 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 3835610243151474499, guid: 67fd03fc8520ef04c9fe7ea6a02fb4b0, type: 3}
-  m_PrefabInstance: {fileID: 1715553232}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f36d82cc64b598f4aa81ff9cfa3708c3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
