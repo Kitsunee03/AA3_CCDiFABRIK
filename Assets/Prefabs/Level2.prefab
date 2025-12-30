@@ -5538,7 +5538,7 @@ GameObject:
   - component: {fileID: 8044471529202469528}
   - component: {fileID: 3068429760927277435}
   - component: {fileID: 1028438746666262797}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Tilemap Level1_Collisions
   m_TagString: Untagged
   m_Icon: {fileID: 0}
