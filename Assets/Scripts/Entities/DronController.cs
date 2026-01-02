@@ -7,6 +7,7 @@ public class DronController : MonoBehaviour
 {
     [Header("Components")]
     private Rigidbody2D rb2d;
+    private SpriteRenderer spriteRenderer;
 
     [Header("Arms")]
     [SerializeField] private CCD arm1;
@@ -24,16 +25,17 @@ public class DronController : MonoBehaviour
     private MyVector2 inputDirection = MyVector2.zero;
 
     [Header("Collectibles")]
-    public UnityEvent<string> onTaskChanged;
-    private int collectedDisks = 0;
-    private int totalDisks = 7;
+    [HideInInspector] public UnityEvent<string> onTaskChanged;
+    private int collectedDisks = 0, totalDisks = 7;
 
     private void Awake()
     {
         kb = Keyboard.current;
         mouse = Mouse.current;
-        rb2d = GetComponent<Rigidbody2D>();
         mainCamera = Camera.main;
+
+        TryGetComponent(out rb2d);
+        TryGetComponent(out spriteRenderer);
     }
 
     private void Start()
@@ -64,6 +66,10 @@ public class DronController : MonoBehaviour
 
         // normalize to prevent faster diagonal movement
         if (inputDirection.magnitude > 0) { inputDirection = inputDirection.normalized; }
+
+        // sprite flip
+        if (inputDirection.x < 0) { spriteRenderer.flipX = true; }
+        else if (inputDirection.x > 0) { spriteRenderer.flipX = false; }
     }
 
     private void HandleMouseTarget()
@@ -125,12 +131,25 @@ public class DronController : MonoBehaviour
     {
         collectedDisks++;
         onTaskChanged?.Invoke("Disks: " + collectedDisks.ToString() + "/" + totalDisks.ToString());
+
+        // check level completion
+        if (collectedDisks >= totalDisks)
+        {
+            GameManager.Instance.EnableLevelExit();
+            onTaskChanged?.Invoke("All disks robbed, Escape!");
+        }
     }
 
     public void SetArmActiveStates(bool isCCDActive, bool isFABRIKActive)
     {
         if (arm1 != null) { arm1.gameObject.SetActive(isCCDActive); }
         if (arm2 != null) { arm2.gameObject.SetActive(isFABRIKActive); }
+    }
+
+    void OnCollisionEnter2D(Collision2D p_collision)
+    {
+        if (p_collision.collider.CompareTag("Finish")) { GameManager.Instance?.LoadLevel(); }
+        if (p_collision.collider.CompareTag("Laser")) { GameManager.Instance?.RestartLevel(); }
     }
 
     #region UI
