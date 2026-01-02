@@ -3,37 +3,64 @@ using TMPro;
 
 public class HUDManager : MonoBehaviour
 {
-    [Header("References")]
-    [SerializeField] private DronController dronController;
-    [SerializeField] private TextMeshProUGUI diskCountText;
+    [Header("Text Components")]
+    [SerializeField] private TextMeshProUGUI currentTaskText;
+    [SerializeField] private TextMeshProUGUI algorithmText;
+    [SerializeField] private TextMeshProUGUI iterationsText;
+    [SerializeField] private TextMeshProUGUI distanceText;
 
-    [Header("Settings")]
-    [SerializeField] private string diskCountFormat = "Discos: {0}";
+    private string lastIterations = "0";
+    private string lastDistances = "-1";
 
-    private void Start()
+    private DronController dronController;
+
+    private void Awake()
     {
-        if (dronController == null)
-        {
-            dronController = FindFirstObjectByType<DronController>();
-        }
-
-        if (dronController != null)
-        {
-            dronController.onDiskCountChanged.AddListener(UpdateDiskDisplay);
-            UpdateDiskDisplay(dronController.CollectedDisks);
-        }
-
-        if (diskCountText == null)
-        {
-            Debug.LogWarning("HUDManager: TextMeshProUGUI no asignado en el inspector.");
-        }
+        dronController = FindFirstObjectByType<DronController>();
+        dronController.onTaskChanged.AddListener(SetTaskDisplay);
     }
 
-    private void UpdateDiskDisplay(int diskCount)
+    private void SetTaskDisplay(string p_info) { currentTaskText.text = p_info; }
+
+    private void Update()
     {
-        if (diskCountText != null)
+        UpdateInfoDisplay();
+    }
+
+    private void UpdateInfoDisplay()
+    {
+        algorithmText.text = dronController.ActiveAlgorithm();
+
+        string iterations = "";
+        if (dronController.IsCCDActive())
         {
-            diskCountText.text = string.Format(diskCountFormat, diskCount);
+            string ccd = dronController.CCDIterationsThisFrame();
+            iterations += ccd;
+        }
+        if (dronController.IsFABRIKActive())
+        {
+            if (iterations != "") iterations += " | ";
+            iterations += dronController.FABRIKIterationsThisFrame();
+        }
+
+        if (iterations != lastIterations)
+        {
+            lastIterations = iterations;
+            iterationsText.text = "Iterations: " + iterations;
+        }
+
+        string distances = "";
+        if (dronController.IsCCDActive()) distances += dronController.CCDDistanceToTarget();
+        if (dronController.IsFABRIKActive())
+        {
+            if (distances != "") distances += " | ";
+            distances += dronController.FABRIKDistanceToTarget();
+        }
+
+        if (distances != lastDistances)
+        {
+            lastDistances = distances;
+            distanceText.text = "Distance: " + distances;
         }
     }
 
@@ -41,7 +68,7 @@ public class HUDManager : MonoBehaviour
     {
         if (dronController != null)
         {
-            dronController.onDiskCountChanged.RemoveListener(UpdateDiskDisplay);
+            dronController.onTaskChanged.RemoveListener(SetTaskDisplay);
         }
     }
 }

@@ -3,11 +3,11 @@ using UnityEngine.Events;
 
 public class DiskController : MonoBehaviour
 {
-    [Header("Configuración")]
-    [SerializeField] private string armEndTag = "ArmEnd"; // Tag del extremo del brazo que puede recoger discos
-    [SerializeField] private AudioSource pickUpSfx; // Opcional: sonido de recogida
-    [Header("Eventos")]
-    public UnityEvent onCollected; // Enlazar aquí la suma en UI o GameManager
+    [Header("Settings")]
+    [SerializeField] private bool isCCDButton = true;
+    [SerializeField] private AudioSource pickUpSfx;
+    [Header("Events")]
+    public UnityEvent onCollected; // Link score increment in UI or GameManager here
 
     private bool armInside;
     private DronController dronInside;
@@ -21,7 +21,12 @@ public class DiskController : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.CompareTag(armEndTag))
+        if (collision.CompareTag("CCDEnd") && isCCDButton) // CCD
+        {
+            armInside = true;
+            dronInside = collision.GetComponentInParent<DronController>();
+        }
+        else if (collision.CompareTag("FABRIKEnd") && !isCCDButton) // FABRIK
         {
             armInside = true;
             dronInside = collision.GetComponentInParent<DronController>();
@@ -30,12 +35,16 @@ public class DiskController : MonoBehaviour
 
     void OnTriggerExit2D(Collider2D collision)
     {
-        if (collision.CompareTag(armEndTag))
+        if (collision.CompareTag("CCDEnd") && isCCDButton) // CCD
         {
             armInside = false;
             dronInside = null;
         }
-        
+        else if (collision.CompareTag("FABRIKEnd") && !isCCDButton) // FABRIK
+        {
+            armInside = false;
+            dronInside = null;
+        }
     }
 
     private void Collect()

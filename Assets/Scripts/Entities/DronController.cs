@@ -24,8 +24,9 @@ public class DronController : MonoBehaviour
     private MyVector2 inputDirection = MyVector2.zero;
 
     [Header("Collectibles")]
-    [SerializeField] public UnityEvent<int> onDiskCountChanged;
-    public int CollectedDisks { get; private set; }
+    public UnityEvent<string> onTaskChanged;
+    private int collectedDisks = 0;
+    private int totalDisks = 7;
 
     private void Awake()
     {
@@ -33,6 +34,11 @@ public class DronController : MonoBehaviour
         mouse = Mouse.current;
         rb2d = GetComponent<Rigidbody2D>();
         mainCamera = Camera.main;
+    }
+
+    private void Start()
+    {
+        onTaskChanged?.Invoke("Disks: " + collectedDisks.ToString() + "/" + totalDisks.ToString());
     }
 
     private void Update()
@@ -117,7 +123,56 @@ public class DronController : MonoBehaviour
 
     public void AddDisk()
     {
-        CollectedDisks++;
-        onDiskCountChanged?.Invoke(CollectedDisks);
+        collectedDisks++;
+        onTaskChanged?.Invoke("Disks: " + collectedDisks.ToString() + "/" + totalDisks.ToString());
     }
+
+    public void SetArmActiveStates(bool isCCDActive, bool isFABRIKActive)
+    {
+        if (arm1 != null) { arm1.gameObject.SetActive(isCCDActive); }
+        if (arm2 != null) { arm2.gameObject.SetActive(isFABRIKActive); }
+    }
+
+    #region UI
+    public bool IsCCDActive() => arm1 != null && arm1.gameObject.activeSelf;
+    public bool IsFABRIKActive() => arm2 != null && arm2.gameObject.activeSelf;
+    public string ActiveAlgorithm()
+    {
+        if (arm1.gameObject.activeSelf && arm2.gameObject.activeSelf) { return "CCD & FABRIK"; }
+        if (arm1.gameObject.activeSelf) { return "CCD"; }
+        if (arm2.gameObject.activeSelf) { return "FABRIK"; }
+
+        return "None";
+    }
+
+    public string CCDIterationsThisFrame()
+    {
+        int iterations = 0;
+        if (arm1.gameObject.activeSelf) { iterations += arm1.IterationsThisFrame; }
+        return iterations.ToString();
+    }
+    public string FABRIKIterationsThisFrame()
+    {
+        int iterations = 0;
+        if (arm2.gameObject.activeSelf) { iterations += arm2.IterationsThisFrame; }
+        return iterations.ToString();
+    }
+
+    public string CCDDistanceToTarget()
+    {
+        if (arm1.gameObject.activeSelf)
+        {
+            return arm1.GetDistanceToTarget().ToString("F2");
+        }
+        return "-1";
+    }
+    public string FABRIKDistanceToTarget()
+    {
+        if (arm2.gameObject.activeSelf)
+        {
+            return arm2.GetDistanceToTarget().ToString("F2");
+        }
+        return "-1";
+    }
+    #endregion
 }

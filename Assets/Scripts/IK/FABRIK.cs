@@ -12,7 +12,7 @@ public class FABRIK : MonoBehaviour
 
     [Header("Algorithm Settings")]
     [SerializeField] private float tolerance = 0.1f;
-    [SerializeField] private int maxIterationsPerFrame = 10;
+    [SerializeField] private int maxIterationsPerFrame = 100;
 
     [Header("Collision Settings")]
     [SerializeField] private LayerMask collisionLayer;
@@ -21,6 +21,8 @@ public class FABRIK : MonoBehaviour
     private List<MyVector2> jointPositions;
     private List<float> boneLengths;
     private IKCollisionHandler collisionHandler;
+
+    public int IterationsThisFrame { get; private set; }
 
     private int TotalCount => joints.Count + 1; // includes base
 
@@ -43,14 +45,20 @@ public class FABRIK : MonoBehaviour
 
         if (distanceToTarget > tolerance)
         {
+            IterationsThisFrame = 0;
             for (int i = 0; i < maxIterationsPerFrame; i++)
             {
                 Forward();
                 Backward();
+                IterationsThisFrame++;
                 if (MyVector2.Distance(jointPositions[LastIndex], targetPosition) <= tolerance) { break; }
             }
 
             SyncTransforms();
+        }
+        else
+        {
+            IterationsThisFrame = 0;
         }
     }
 
@@ -139,5 +147,11 @@ public class FABRIK : MonoBehaviour
             MyVector2 pos = jointPositions[i + 1];
             joints[i].position = new(pos.x, pos.y, joints[i].position.z);
         }
+    }
+
+    public float GetDistanceToTarget()
+    {
+        if (!hasTarget) return -1f;
+        return MyVector2.Distance(jointPositions[LastIndex], targetPosition);
     }
 }
